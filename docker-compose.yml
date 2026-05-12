@@ -1,0 +1,82 @@
+name: appam-docker
+
+services:
+    apache:
+        container_name: apache
+        build:
+            context: ./docker/apache
+            dockerfile: Dockerfile
+        restart: unless-stopped
+        ports:
+            - "80:80"
+        volumes:
+            - ./docker/apache/vhosts:/etc/apache2/sites-enabled:ro
+            - .:/var/www/html
+        depends_on:
+            - php
+            - postgres
+        networks:
+            - default
+    php:
+        container_name: php
+        build:
+            context: ./docker/php
+            dockerfile: Dockerfile
+        user: www-data
+        extra_hosts:
+            - "host.docker.internal:host-gateway"
+        volumes:
+            - ./:/var/www/html
+        restart: unless-stopped
+        tty: true
+        stdin_open: true
+        networks:
+            - default
+    postgres:
+        container_name: postgres
+        image: postgres:latest
+        restart: always
+        environment:
+            POSTGRES_DB: app
+            POSTGRES_USER: secret
+            POSTGRES_PASSWORD: secret
+        ports:
+            - "5432:5432"
+        volumes:
+            - postgres_data:/var/lib/postgresql:rw
+        networks:
+            - default
+    adminer:
+        container_name: adminer
+        image: adminer:latest
+        restart: unless-stopped
+        environment:
+            ADMINER_DEFAULT_SERVER: postgres
+            ADMINER_DESIGN: "nette"
+        depends_on:
+            - postgres
+        ports:
+            - "8888:8080"
+        networks:
+            - default
+    mailer:
+        container_name: mailer
+        image: axllent/mailpit:latest
+        ports:
+            - "1025:1025"
+            - "8025:8025"
+        environment:
+            MP_SMTP_AUTH_ACCEPT_ANY: 1
+            MP_SMTP_AUTH_ALLOW_INSECURE: 1
+        networks:
+            - default
+
+volumes:
+    postgres_data:
+        name: db_data
+        driver: local
+
+networks:
+    default:
+        name: appapm-network
+        driver: bridge
